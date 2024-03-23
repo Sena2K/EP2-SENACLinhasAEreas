@@ -19,6 +19,7 @@ from matplotlib import pyplot as plt
 #     ("Belo Horizonte (CNF)", "Brasília (BSB)")
 # ]
 
+
 voos_diarios = {
     ("São Paulo (GRU)", "Rio de Janeiro (GIG)"): (1.0, 10),
     ("São Paulo (GRU)", "Brasília (BSB)"): (2.0, 6),
@@ -41,24 +42,27 @@ def gerar_individuo():
         horarios = []
         for _ in range(num_voos_diarios):
             # gerando horarios aleatorios entre 6h e 22h, levando em consideraçao a duraçao do voo
-            horario = random.randint(6, 22 - int(duracao_voo))
+            horario = random.randint(6, 24 - int(duracao_voo))
             horarios.append(horario)
         individuo[rota] = horarios
     return individuo
 
-def calcular_fitness(individuo):
+
+def calcular_fitness(individuo): # nao sei se faz mais sentido, to pensando sobre...
     avioes_ocupados = set()
-    penalidade = 0
     for rota, horarios in individuo.items():
-        duracao_voo, _ = voos_diarios[rota] # ignorando o segundo valor da dupla so isso, python god.
+        duracao_voo, _ = voos_diarios[rota]
         for horario in horarios:
             for hora in range(horario, horario + int(duracao_voo) + 1):
-                if hora >= 6 and hora <= 22:
+                if 6 <= hora <= 24:
                     avioes_ocupados.add(hora)
-    for hora in range(6, 23):
-        if hora not in avioes_ocupados:
-            penalidade += 1
+
+    aeronaves_nao_utilizadas = set(range(6, 25)) - avioes_ocupados
+    penalidade = len(aeronaves_nao_utilizadas)
+
     return len(avioes_ocupados) + penalidade
+
+
 def selecao_torneio(populacao, tamanho_torneio):
     torneio = random.sample(populacao, tamanho_torneio)
     melhor_individuo = min(torneio, key=lambda ind: calcular_fitness(ind))
@@ -84,13 +88,50 @@ def crossover(pai1, pai2):
                 filho[rota] = pai2[rota]
     return filho
 
-def mutacao(individuo):
-    rota = random.choice(list(individuo.keys()))
-    horarios = individuo[rota]
-    duracao_voo, _ = voos_diarios[rota]
-    horarios[random.randint(0, len(horarios) - 1)] = random.randint(6, 22 - int(duracao_voo))
-    individuo[rota] = horarios
+
+# def mutacao(individuo):
+#     rota = random.choice(list(individuo.keys()))
+#     horarios = individuo[rota]
+#
+#     # Selecionar um horário aleatório
+#     index = random.randint(0, len(horarios) - 1)
+#
+#     novo_horario = random.randint(6, 24 - int(voos_diarios[rota][0]))
+#     while novo_horario in horarios:
+#         novo_horario = random.randint(6, 24 - int(voos_diarios[rota][0]))
+#
+#     # Substituir o horário antigo pelo novo horário
+#     horarios[index] = novo_horario
+#
+#     individuo[rota] = horarios
+#     return individuo
+
+def mutacao_troca_voos(individuo):
+    rotas = list(individuo.keys())
+    rota1, rota2 = random.sample(rotas, 2)
+    horarios1 = individuo[rota1]
+    horarios2 = individuo[rota2]
+    index1 = random.randint(0, len(horarios1) - 1)
+    index2 = random.randint(0, len(horarios2) - 1)
+    horarios1[index1], horarios2[index2] = horarios2[index2], horarios1[index1]
+    individuo[rota1] = horarios1
+    individuo[rota2] = horarios2
     return individuo
+
+# def mutacao_adicao_remocao_voos(individuo):
+#     rota = random.choice(list(individuo.keys()))
+#     duracao_voo, num_voos_diarios = voos_diarios[rota]
+#     horarios = individuo[rota]
+#     if random.random() < 0.5:
+#         if len(horarios) < num_voos_diarios:
+#             novo_horario = random.randint(6, 22 - int(duracao_voo))
+#             horarios.append(novo_horario)
+#     else:
+#         if len(horarios) > 1:
+#             horarios.pop(random.randint(0, len(horarios) - 1))
+#     individuo[rota] = sorted(horarios)
+#     return individuo
+
 
 def algoritmo_genetico(tamanho_populacao, geracoes, tamanho_torneio):
     populacao = [gerar_individuo() for _ in range(tamanho_populacao)]
@@ -101,7 +142,7 @@ def algoritmo_genetico(tamanho_populacao, geracoes, tamanho_torneio):
             pai2 = selecao_torneio(populacao, tamanho_torneio)
             filho = crossover(pai1, pai2)
             if random.random() < 0.1:  # Chance de mutaçao
-                filho = mutacao(filho)
+                filho = mutacao_troca_voos(filho)
             nova_populacao.append(filho)
         populacao = nova_populacao
     melhor_individuo = min(populacao, key=lambda ind: calcular_fitness(ind))
