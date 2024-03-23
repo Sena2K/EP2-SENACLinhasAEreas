@@ -35,25 +35,29 @@ voos_diarios = {
     ("Belo Horizonte (CNF)", "Brasília (BSB)"): (1.5, 7)
 }
 
+
 def gerar_individuo():
     individuo = {}
     for rota in voos_diarios:
         duracao_voo, num_voos_diarios = voos_diarios[rota]
         horarios = []
         for _ in range(num_voos_diarios):
-            # gerando horarios aleatorios entre 6h e 22h, levando em consideraçao a duraçao do voo
-            horario = random.randint(6, 24 - int(duracao_voo))
+            # embarque e desembarque
+            embarque = 1.0
+            desembarque = 0.5
+            horario = random.randint(6 + int(embarque), 24 - int(duracao_voo) - int(desembarque))
             horarios.append(horario)
         individuo[rota] = horarios
     return individuo
-
 
 def calcular_fitness(individuo): # nao sei se faz mais sentido, to pensando sobre...
     avioes_ocupados = set()
     for rota, horarios in individuo.items():
         duracao_voo, _ = voos_diarios[rota]
+        embarque = 1.0
+        desembarque = 0.5
         for horario in horarios:
-            for hora in range(horario, horario + int(duracao_voo) + 1):
+            for hora in range(horario - int(embarque), horario + int(duracao_voo) + int(desembarque) + 1):
                 if 6 <= hora <= 24:
                     avioes_ocupados.add(hora)
 
@@ -61,6 +65,7 @@ def calcular_fitness(individuo): # nao sei se faz mais sentido, to pensando sobr
     penalidade = len(aeronaves_nao_utilizadas)
 
     return len(avioes_ocupados) + penalidade
+
 
 
 def selecao_torneio(populacao, tamanho_torneio):
