@@ -1,81 +1,166 @@
 import random
 
 # Definindo os dados do problema
-rotas = [
-    ("São Paulo (GRU)", "Rio de Janeiro (GIG)", 1.0),
-    ("São Paulo (GRU)", "Brasília (BSB)", 2.0),
-    ("São Paulo (GRU)", "Belo Horizonte (CNF)", 1.5),
-    ("Rio de Janeiro (GIG)", "São Paulo (GRU)", 1.0),
-    ("Rio de Janeiro (GIG)", "Brasília (BSB)", 2.0),
-    ("Rio de Janeiro (GIG)", "Belo Horizonte (CNF)", 1.5),
-    ("Brasília (BSB)", "São Paulo (GRU)", 2.0),
-    ("Brasília (BSB)", "Rio de Janeiro (GIG)", 2.0),
-    ("Brasília (BSB)", "Belo Horizonte (CNF)", 1.5),
-    ("Belo Horizonte (CNF)", "São Paulo (GRU)", 1.5),
-    ("Belo Horizonte (CNF)", "Rio de Janeiro (GIG)", 1.5),
-    ("Belo Horizonte (CNF)", "Brasília (BSB)", 1.5)
-]
-
 voos_diarios = {
-    ("São Paulo (GRU)", "Rio de Janeiro (GIG)"): 10,
-    ("São Paulo (GRU)", "Brasília (BSB)"): 6,
-    ("São Paulo (GRU)", "Belo Horizonte (CNF)"): 8,
-    ("Rio de Janeiro (GIG)", "São Paulo (GRU)"): 10,
-    ("Rio de Janeiro (GIG)", "Brasília (BSB)"): 5,
-    ("Rio de Janeiro (GIG)", "Belo Horizonte (CNF)"): 6,
-    ("Brasília (BSB)", "São Paulo (GRU)"): 6,
-    ("Brasília (BSB)", "Rio de Janeiro (GIG)"): 5,
-    ("Brasília (BSB)", "Belo Horizonte (CNF)"): 7,
-    ("Belo Horizonte (CNF)", "São Paulo (GRU)"): 8,
-    ("Belo Horizonte (CNF)", "Rio de Janeiro (GIG)"): 6,
-    ("Belo Horizonte (CNF)", "Brasília (BSB)"): 7
+    ("Sao Paulo (GRU)", "Rio de Janeiro (GIG)"): (1.0, 10),
+    ("Sao Paulo (GRU)", "Brasilia (BSB)"): (2.0, 6),
+    ("Sao Paulo (GRU)", "Belo Horizonte (CNF)"): (1.5, 8),
+    ("Rio de Janeiro (GIG)", "Sao Paulo (GRU)"): (1.0, 10),
+    ("Rio de Janeiro (GIG)", "Brasilia (BSB)"): (2.0, 5),
+    ("Rio de Janeiro (GIG)", "Belo Horizonte (CNF)"): (1.5, 6),
+    ("Brasilia (BSB)", "Sao Paulo (GRU)"): (2.0, 6),
+    ("Brasilia (BSB)", "Rio de Janeiro (GIG)"): (2.0, 5),
+    ("Brasilia (BSB)", "Belo Horizonte (CNF)"): (1.5, 7),
+    ("Belo Horizonte (CNF)", "Sao Paulo (GRU)"): (1.5, 8),
+    ("Belo Horizonte (CNF)", "Rio de Janeiro (GIG)"): (1.5, 6),
+    ("Belo Horizonte (CNF)", "Brasilia (BSB)"): (1.5, 7)
 }
 
 def gerar_individuo():
-    return {rota: random.randint(1, 10) for rota in rotas}
+  individuo = {}
+  for rota in voos_diarios:
+    duracao_voo, num_voos_diarios = voos_diarios[rota]
+    horarios = []
+    for _ in range(num_voos_diarios):
+      embarque = 1.0
+      desembarque = 0.5
+      while True:
+        horario = random.randint(6 + int(embarque), 24 - int(duracao_voo) - int(desembarque))
+        sobreposicao = False
+        for h in horarios:
+          if (h - int(duracao_voo) <= horario <= h + int(desembarque)) or (horario - int(duracao_voo) <= h <= horario + int(desembarque)):
+            sobreposicao = True
+            break
+        if not sobreposicao:
+          break
+      horarios.append(horario)
+    individuo[rota] = horarios
+  return individuo
 
 def calcular_fitness(individuo):
-    avioes_usados = set()
-    for aviao in individuo.values():
-        avioes_usados.add(aviao)
-    return len(avioes_usados)
+    avioes_ocupados = set()
+    for rota, horarios in individuo.items():
+        duracao_voo, _ = voos_diarios[rota]
+        embarque = 1.0
+        desembarque = 0.5
+        for horario in horarios:
+            for hora in range(horario - int(embarque), horario + int(duracao_voo) + int(desembarque) + 1):
+                if 6 <= hora <= 24:
+                    avioes_ocupados.add(hora)
 
-# Função de seleção por tragedia
-def selecao_tragedia(populacao, num_a_manter):
-    populacao_ordenada = sorted(populacao, key=lambda ind: calcular_fitness(ind))
-    return populacao_ordenada[:num_a_manter]
+    aeronaves_nao_utilizadas = set(range(6, 25)) - avioes_ocupados
+    penalidade = len(aeronaves_nao_utilizadas)
 
-# Função de mutação de troca de genes
-def mutacao(individuo):
-    rota = random.choice(rotas)
-    individuo[rota] = random.randint(1, 10)
-    return individuo
+    return len(avioes_ocupados) + penalidade
 
-def crossover(pai1, pai2):
-    filho = {}
-    for rota in rotas:
-        if random.random() < 0.5:
-            filho[rota] = pai1[rota]
-        else:
-            filho[rota] = pai2[rota]
-    return filho
+def validar_solucao(solucao):
+    # Verificar cobertura de voos
+    voos_cobertos = set()
+    for rota, horarios in solucao.items():
+        for horario in horarios:
+            voos_cobertos.add((rota[0], rota[1]))
 
-def algoritmo_genetico(tamanho_populacao, geracoes):
+    todas_rotas = set(voos_diarios.keys())
+    if voos_cobertos != todas_rotas:
+        return False, "Alguns voos nao estao cobertos pela alocacao de avioes."
+
+    # Verificar sobreposicoes de horarios
+    horarios_ocupados = set()
+    for horarios in solucao.values():
+        for horario in horarios:
+            if horario in horarios_ocupados:
+                return False, "Ha sobreposicao de horarios para os avioes."
+            horarios_ocupados.add(horario)
+
+    # Verificar restricoes de tempo de manutencao
+    for horarios in solucao.values():
+        horarios.sort()
+        for i in range(len(horarios) - 1):
+            if horarios[i+1] - horarios[i] < 1.5:  # Tempo minimo de manutencao entre voos
+                return False, "Restricoes de tempo de manutencao nao estao sendo respeitadas."
+
+    return True, "Solucao valida."
+
+
+def algoritmo_genetico(tamanho_populacao, geracoes, tamanho_torneio):
     populacao = [gerar_individuo() for _ in range(tamanho_populacao)]
     for _ in range(geracoes):
-        populacao = selecao_tragedia(populacao, tamanho_populacao // 2)
-        while len(populacao) < tamanho_populacao:
-            pai1 = random.choice(populacao)
-            pai2 = random.choice(populacao)
+        nova_populacao = []
+        for _ in range(tamanho_populacao):
+            pai1 = selecao_torneio(populacao, tamanho_torneio)
+            pai2 = selecao_torneio(populacao, tamanho_torneio)
             filho = crossover(pai1, pai2)
-            if random.random() < 0.1:  # Chance de mutação
-                filho = mutacao(filho)
-            populacao.append(filho)
-    melhor_individuo = min(populacao, key=lambda ind: calcular_fitness(ind))
+            if random.random() < 0.1:  # Chance de mutacao
+                filho = mutacao_troca_voos(filho)
+            nova_populacao.append(filho)
+        populacao = nova_populacao
+    melhor_solucao = min(populacao, key=lambda ind: calcular_fitness(ind))
+    return melhor_solucao
+
+def selecao_torneio(populacao, tamanho_torneio):
+    torneio = random.sample(populacao, tamanho_torneio)
+    melhor_individuo = min(torneio, key=lambda ind: calcular_fitness(ind))
     return melhor_individuo
 
-melhor_solucao = algoritmo_genetico(tamanho_populacao=50, geracoes=100)
-print("Melhor alocação de aviões:")
-for rota, num_avioes in melhor_solucao.items():
-    print(f"{rota[0]} -> {rota[1]}: {num_avioes} aviões")
-print("Fitness:", calcular_fitness(melhor_solucao))
+def crossover(pai1, pai2):
+    rotas_pai1 = list(pai1.keys())
+    rotas_pai2 = list(pai2.keys())
+    rota_comum = random.choice(list(set(rotas_pai1) & set(rotas_pai2)))
+    horarios_pai1 = pai1[rota_comum]
+    horarios_pai2 = pai2[rota_comum]
+    filho = {}
+    for rota in rotas_pai1 + rotas_pai2:
+        if rota == rota_comum:
+            horarios_filho = []
+            for h1, h2 in zip(horarios_pai1, horarios_pai2):
+                horarios_filho.append(random.choice([h1, h2]))
+            filho[rota] = horarios_filho
+        else:
+            if rota in pai1:
+                filho[rota] = pai1[rota]
+            else:
+                filho[rota] = pai2[rota]
+    return filho
+
+def mutacao_troca_voos(individuo):
+  rotas = list(individuo.keys())
+  rota1, rota2 = random.sample(rotas, 2)
+  horarios1 = individuo[rota1]
+  horarios2 = individuo[rota2]
+  index1 = random.randint(0, len(horarios1) - 1)
+  index2 = random.randint(0, len(horarios2) - 1)
+  horarios1[index1], horarios2[index2] = horarios2[index2], horarios1[index1]
+  individuo[rota1] = horarios1
+  individuo[rota2] = horarios2
+
+  # Verificar se há sobreposição após a troca
+  for rota in rotas:
+    horarios = individuo[rota]
+    for i in range(len(horarios) - 1):
+      if horarios[i+1] - horarios[i] < 1.5:
+        # Trocar os horários novamente até que não haja sobreposição
+        while True:
+          horarios[i], horarios[i+1] = horarios[i+1], horarios[i]
+          if horarios[i+1] - horarios[i] >= 1.5:
+            break
+
+  return individuo
+
+# Funcao para executar o algoritmo genetico e validar a solucao encontrada
+def executar_algoritmo_genetico():
+    melhor_solucao = algoritmo_genetico(tamanho_populacao=50, geracoes=100, tamanho_torneio=5)
+    print("Melhor alocacao de avioes:")
+    for rota, horarios in melhor_solucao.items():
+        print(f"{rota[0]} -> {rota[1]}: {horarios}")
+    print("Fitness:", calcular_fitness(melhor_solucao))
+
+    # Validar a solucao encontrada
+    solucao_valida, mensagem = validar_solucao(melhor_solucao)
+    if solucao_valida:
+        print("A solucao encontrada e valida.")
+    else:
+        print("A solucao encontrada e invalida:", mensagem)
+
+
+# Executar o algoritmo genetico
+executar_algoritmo_genetico()
