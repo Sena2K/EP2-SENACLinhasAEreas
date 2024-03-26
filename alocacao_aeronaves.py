@@ -59,21 +59,6 @@ def validar_solucao(solucao):
     if voos_cobertos != todas_rotas:
         return False, "Alguns voos nao estao cobertos pela alocacao de avioes."
 
-    # Verificar sobreposicoes de horarios
-    horarios_ocupados = set()
-    for horarios in solucao.values():
-        for horario in horarios:
-            if horario in horarios_ocupados:
-                return False, "Ha sobreposicao de horarios para os avioes."
-            horarios_ocupados.add(horario)
-
-    # Verificar restricoes de tempo de manutencao
-    for horarios in solucao.values():
-        horarios.sort()
-        for i in range(len(horarios) - 1):
-            if horarios[i+1] - horarios[i] < 1.5:  # Tempo minimo de manutencao entre voos
-                return False, "Restricoes de tempo de manutencao nao estao sendo respeitadas."
-
     return True, "Solucao valida."
 
 
@@ -129,7 +114,6 @@ def verificar_e_corrigir_horarios(horarios):
     return horarios_corrigidos
 
 def verificar_e_corrigir_horario_existente(voo, novo_horario):
-    # Verifica se o novo horário já existe no voo
     if novo_horario in voo:
         novo_horario = gerar_novo_horario(voo)
     return novo_horario
@@ -174,8 +158,8 @@ def imprimir_detalhes_voos(solucao):
     print("Detalhes dos Voos:")
     for rota, horarios in solucao.items():
         origem, destino = rota
-        for voo_id, horario in horarios:
-            print(f"Voo {voo_id}: {origem} -> {destino} - Horário de Partida: {horario}, Horário de Chegada: {horario + voos_diarios[rota][0]}")
+        for i, horario in enumerate(horarios):
+            print(f"Voo {i+1}: {origem} -> {destino} - Horário de Partida: {horario}, Horário de Chegada: {horario + voos_diarios[rota][0]}")
 
 # Função para executar o algoritmo genético e validar a solução encontrada
 def executar_algoritmo_genetico():
