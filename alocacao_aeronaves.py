@@ -24,7 +24,10 @@ def gerar_individuo():
         for _ in range(num_voos_diarios):
             embarque = 1.0
             desembarque = 0.5
-            horario = random.randint(6 + int(embarque), 24 - int(duracao_voo) - int(desembarque))
+            while True:
+                horario = random.randint(6 + int(embarque), 24 - int(duracao_voo) - int(desembarque))
+                if horario not in horarios:  # Verifica se o horário já foi utilizado
+                    break
             horarios.append(horario)
         individuo[rota] = horarios
     return individuo
@@ -106,13 +109,37 @@ def crossover(pai1, pai2):
             horarios_filho = []
             for h1, h2 in zip(horarios_pai1, horarios_pai2):
                 horarios_filho.append(random.choice([h1, h2]))
+            # Verifica e ajusta possíveis horários duplicados
+            horarios_filho = verificar_e_corrigir_horarios(horarios_filho)
             filho[rota] = horarios_filho
         else:
             if rota in pai1:
                 filho[rota] = pai1[rota]
             else:
                 filho[rota] = pai2[rota]
+
     return filho
+
+def verificar_e_corrigir_horarios(horarios):
+    horarios_corrigidos = []
+    for horario in horarios:
+        while horario in horarios_corrigidos:
+            horario = gerar_novo_horario(horarios_corrigidos)
+        horarios_corrigidos.append(horario)
+    return horarios_corrigidos
+
+def verificar_e_corrigir_horario_existente(voo, novo_horario):
+    # Verifica se o novo horário já existe no voo
+    if novo_horario in voo:
+        novo_horario = gerar_novo_horario(voo)
+    return novo_horario
+
+def gerar_novo_horario(voo):
+    # Gera um novo horário aleatório para o voo
+    novo_horario = random.choice(range(6, 25))
+    while novo_horario in voo:
+        novo_horario = random.choice(range(6, 25))
+    return novo_horario
 
 def mutacao_troca_voos(individuo):
     rotas = list(individuo.keys())
@@ -122,24 +149,51 @@ def mutacao_troca_voos(individuo):
     index1 = random.randint(0, len(horarios1) - 1)
     index2 = random.randint(0, len(horarios2) - 1)
     horarios1[index1], horarios2[index2] = horarios2[index2], horarios1[index1]
+
+    # Verifica e ajusta possíveis horários duplicados
+    horarios1 = verificar_e_corrigir_horarios(horarios1)
+    horarios2 = verificar_e_corrigir_horarios(horarios2)
+
     individuo[rota1] = horarios1
     individuo[rota2] = horarios2
     return individuo
+
+def verificar_e_ajustar_horario_voo(individuo, rota, novo_horario):
+    horarios = individuo.get(rota, [])
+    if novo_horario in horarios:
+        novo_horario = gerar_novo_horario(horarios)
+    return novo_horario
+
+def gerar_novo_horario(horarios_existentes):
+    novo_horario = random.choice(range(6, 25))  # Gerar um novo horário aleatório
+    while novo_horario in horarios_existentes:
+        novo_horario = random.choice(range(6, 25))
+    return novo_horario
 # Funcao para executar o algoritmo genetico e validar a solucao encontrada
+def imprimir_detalhes_voos(solucao):
+    print("Detalhes dos Voos:")
+    for rota, horarios in solucao.items():
+        origem, destino = rota
+        for voo_id, horario in horarios:
+            print(f"Voo {voo_id}: {origem} -> {destino} - Horário de Partida: {horario}, Horário de Chegada: {horario + voos_diarios[rota][0]}")
+
+# Função para executar o algoritmo genético e validar a solução encontrada
 def executar_algoritmo_genetico():
     melhor_solucao = algoritmo_genetico(tamanho_populacao=50, geracoes=100, tamanho_torneio=5)
     print("Melhor alocacao de avioes:")
     for rota, horarios in melhor_solucao.items():
         print(f"{rota[0]} -> {rota[1]}: {horarios}")
-    print("Fitness:", calcular_fitness(melhor_solucao))
+    print("O número de aviões necessário é:", calcular_fitness(melhor_solucao))
 
-    # Validar a solucao encontrada
+    # Validar a solução encontrada
     solucao_valida, mensagem = validar_solucao(melhor_solucao)
     if solucao_valida:
-        print("A solucao encontrada e valida.")
+        print("A solução encontrada é válida.")
+        # Imprimir detalhes dos voos na solução
+        imprimir_detalhes_voos(melhor_solucao)
     else:
-        print("A solucao encontrada e invalida:", mensagem)
+        print("A solução encontrada é inválida:", mensagem)
 
 
-# Executar o algoritmo genetico
+# Executar o algoritmo genético
 executar_algoritmo_genetico()
