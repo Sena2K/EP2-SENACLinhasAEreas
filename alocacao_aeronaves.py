@@ -159,7 +159,7 @@ def imprimir_detalhes_voos(solucao):
     for rota, horarios in solucao.items():
         origem, destino = rota
         for i, horario in enumerate(horarios):
-            print(f"Voo {i+1}: {origem} -> {destino} - Horário de Partida: {horario}, Horário de Chegada: {horario + voos_diarios[rota][0]}")
+            print(f"Voo {i+1}: {origem} -> {destino} -> Embarque: {horario - 1} - Horário de Partida: {horario}, Horário de Chegada: {horario + voos_diarios[rota][0]}")
 
 # Função para executar o algoritmo genético e validar a solução encontrada
 def executar_algoritmo_genetico():
