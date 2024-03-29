@@ -1,151 +1,79 @@
 import random
 
 voos_diarios = {
-    ("São Paulo (GRU)", "Rio de Janeiro (GIG)"): (1.0, 10),
-    ("São Paulo (GRU)", "Brasília (BSB)"): (2.0, 6),
-    ("São Paulo (GRU)", "Belo Horizonte (CNF)"): (1.5, 8),
-    ("Rio de Janeiro (GIG)", "São Paulo (GRU)"): (1.0, 10),
-    ("Rio de Janeiro (GIG)", "Brasília (BSB)"): (2.0, 5),
+    ("Sao Paulo (GRU)", "Rio de Janeiro (GIG)"): (1.0, 10),
+    ("Sao Paulo (GRU)", "Brasilia (BSB)"): (2.0, 6),
+    ("Sao Paulo (GRU)", "Belo Horizonte (CNF)"): (1.5, 8),
+    ("Rio de Janeiro (GIG)", "Sao Paulo (GRU)"): (1.0, 10),
+    ("Rio de Janeiro (GIG)", "Brasilia (BSB)"): (2.0, 5),
     ("Rio de Janeiro (GIG)", "Belo Horizonte (CNF)"): (1.5, 6),
-    ("Brasília (BSB)", "São Paulo (GRU)"): (2.0, 6),
-    ("Brasília (BSB)", "Rio de Janeiro (GIG)"): (2.0, 5),
-    ("Brasília (BSB)", "Belo Horizonte (CNF)"): (1.5, 7),
-    ("Belo Horizonte (CNF)", "São Paulo (GRU)"): (1.5, 8),
+    ("Brasilia (BSB)", "Sao Paulo (GRU)"): (2.0, 6),
+    ("Brasilia (BSB)", "Rio de Janeiro (GIG)"): (2.0, 5),
+    ("Brasilia (BSB)", "Belo Horizonte (CNF)"): (1.5, 7),
+    ("Belo Horizonte (CNF)", "Sao Paulo (GRU)"): (1.5, 8),
     ("Belo Horizonte (CNF)", "Rio de Janeiro (GIG)"): (1.5, 6),
-    ("Belo Horizonte (CNF)", "Brasília (BSB)"): (1.5, 7)
+    ("Belo Horizonte (CNF)", "Brasilia (BSB)"): (1.5, 7)
 }
-
 
 def gerar_individuo():
     individuo = {}
-    aviao_id = 1
-    for rota in voos_diarios:
-        duracao_voo, num_voos_diarios = voos_diarios[rota]
-        horarios = []
-        for _ in range(num_voos_diarios):
-            embarque = 1.0
-            desembarque = 0.5
-            horario = random.randint(6 + int(embarque), 24 - int(duracao_voo) - int(desembarque))
-            horarios.append((aviao_id, horario))
-            aviao_id += 1
-        individuo[rota] = horarios
+    for rota, (_, num_voos_diarios) in voos_diarios.items():
+        horarios = random.sample(range(6, 22), num_voos_diarios)
+        individuo[rota] = sorted(horarios)
     return individuo
 
 def calcular_fitness(individuo):
-    avioes_utilizados = set()
-    for rota, horarios in individuo.items():
-        for aviao_id, _ in horarios:
-            avioes_utilizados.add(aviao_id)
-
-    avioes_ocupados = set()
+    aviões = []  
     for rota, horarios in individuo.items():
         duracao_voo, _ = voos_diarios[rota]
-        embarque = 1.0
-        desembarque = 0.5
-        for _, horario in horarios:
-            for hora in range(horario - int(embarque), horario + int(duracao_voo) + int(desembarque) + 1):
-                if 6 <= hora <= 24:
-                    avioes_ocupados.add(hora)
+        for horario in horarios:
+            horario_inicio = horario - 1
+            horario_fim = horario + duracao_voo + 0.5
+            aviao_alocado = False
+            for aviao in aviões:
+                if all(horario_inicio >= f or horario_fim <= i for i, f in aviao):
+                    aviao.append((horario_inicio, horario_fim))
+                    aviao_alocado = True
+                    break
+            if not aviao_alocado:
+                aviões.append([(horario_inicio, horario_fim)])
+    return len(aviões)
 
-    aeronaves_nao_utilizadas = set(range(6, 25)) - avioes_ocupados
-    penalidade = len(aeronaves_nao_utilizadas)
-
-    numero_avioes_necessarios = len(avioes_utilizados)
-    return numero_avioes_necessarios + penalidade
-
-
-def selecao_torneio(populacao, tamanho_torneio):
+def selecao_torneio(populacao, tamanho_torneio=5):
     torneio = random.sample(populacao, tamanho_torneio)
-    melhor_individuo = min(torneio, key=lambda ind: calcular_fitness(ind))
-    return melhor_individuo
+    melhor = min(torneio, key=calcular_fitness)
+    return melhor
 
 def crossover(pai1, pai2):
-    rotas_pai1 = list(pai1.keys())
-    rotas_pai2 = list(pai2.keys())
-    rota_comum = random.choice(list(set(rotas_pai1) & set(rotas_pai2)))  # Escolhe uma rota em comum
-    horarios_pai1 = pai1[rota_comum]
-    horarios_pai2 = pai2[rota_comum]
     filho = {}
-    for rota in rotas_pai1 + rotas_pai2:
-        if rota == rota_comum:
-            horarios_filho = []
-            for h1, h2 in zip(horarios_pai1, horarios_pai2):
-                horarios_filho.append(random.choice([h1, h2]))
-            filho[rota] = horarios_filho
-        else:
-            if rota in pai1:
-                filho[rota] = pai1[rota]
-            else:
-                filho[rota] = pai2[rota]
+    for rota in voos_diarios.keys():
+        filho[rota] = pai1[rota] if random.random() < 0.5 else pai2[rota]
     return filho
 
-
-# def mutacao(individuo):
-#     rota = random.choice(list(individuo.keys()))
-#     horarios = individuo[rota]
-#
-#     # Selecionar um horário aleatório
-#     index = random.randint(0, len(horarios) - 1)
-#
-#     novo_horario = random.randint(6, 24 - int(voos_diarios[rota][0]))
-#     while novo_horario in horarios:
-#         novo_horario = random.randint(6, 24 - int(voos_diarios[rota][0]))
-#
-#     # Substituir o horário antigo pelo novo horário
-#     horarios[index] = novo_horario
-#
-#     individuo[rota] = horarios
-#     return individuo
-
-def mutacao_troca_voos(individuo):
-    rotas = list(individuo.keys())
-    rota1, rota2 = random.sample(rotas, 2)
-    horarios1 = individuo[rota1]
-    horarios2 = individuo[rota2]
-    index1 = random.randint(0, len(horarios1) - 1)
-    index2 = random.randint(0, len(horarios2) - 1)
-    horarios1[index1], horarios2[index2] = horarios2[index2], horarios1[index1]
-    individuo[rota1] = horarios1
-    individuo[rota2] = horarios2
+def mutacao(individuo):
+    rota = random.choice(list(voos_diarios.keys()))
+    num_voos_diarios = voos_diarios[rota][1]
+    if rota in individuo and individuo[rota]:
+        index = random.randrange(len(individuo[rota]))
+        individuo[rota][index] = random.randint(6, 21)
+        individuo[rota] = sorted(individuo[rota])
     return individuo
 
-# def mutacao_adicao_remocao_voos(individuo):
-#     rota = random.choice(list(individuo.keys()))
-#     duracao_voo, num_voos_diarios = voos_diarios[rota]
-#     horarios = individuo[rota]
-#     if random.random() < 0.5:
-#         if len(horarios) < num_voos_diarios:
-#             novo_horario = random.randint(6, 22 - int(duracao_voo))
-#             horarios.append(novo_horario)
-#     else:
-#         if len(horarios) > 1:
-#             horarios.pop(random.randint(0, len(horarios) - 1))
-#     individuo[rota] = sorted(horarios)
-#     return individuo
-
-
-
-def algoritmo_genetico(tamanho_populacao, geracoes, tamanho_torneio):
+def algoritmo_genetico(tamanho_populacao=50, geracoes=100, taxa_mutacao=0.1):
     populacao = [gerar_individuo() for _ in range(tamanho_populacao)]
     for _ in range(geracoes):
         nova_populacao = []
-        for _ in range(tamanho_populacao):
-            pai1 = selecao_torneio(populacao, tamanho_torneio)
-            pai2 = selecao_torneio(populacao, tamanho_torneio)
+        while len(nova_populacao) < tamanho_populacao:
+            pai1 = selecao_torneio(populacao)
+            pai2 = selecao_torneio(populacao)
             filho = crossover(pai1, pai2)
-            if random.random() < 0.1:  # Chance de mutação
-                filho = mutacao_troca_voos(filho)
+            if random.random() < taxa_mutacao:
+                filho = mutacao(filho)
             nova_populacao.append(filho)
-        populacao = nova_populacao
-    melhor_individuo = min(populacao, key=lambda ind: calcular_fitness(ind))
-    return melhor_individuo
+        populacao = sorted(nova_populacao, key=calcular_fitness)[:tamanho_populacao]
+    return min(populacao, key=calcular_fitness)
 
-melhor_solucao = algoritmo_genetico(tamanho_populacao=50, geracoes=100, tamanho_torneio=5)
-print("Melhor alocação de aviões:")
+melhor_solucao = algoritmo_genetico()
+print("Número mínimo de aviões necessários:", calcular_fitness(melhor_solucao))
 for rota, horarios in melhor_solucao.items():
-    print(f"{rota[0]} -> {rota[1]}:")
-    for aviao_id, horario in horarios:
-        print(f"Avião {aviao_id}: {horario}")
-print("Fitness:", calcular_fitness(melhor_solucao))
-print("Número de aviões utilizados:", len(set(aviao_id for horarios in melhor_solucao.values() for aviao_id, _ in horarios)))
-
+    print(f"Rota {rota}: {horarios}")
