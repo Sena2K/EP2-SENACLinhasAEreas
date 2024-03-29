@@ -15,11 +15,11 @@ voos_diarios = {
     ("Belo Horizonte (CNF)", "Brasilia (BSB)"): (1.5, 7)
 }
 
-def gerar_individuo():
+def gerar_individuo_sem_sobreposicao():
     individuo = {}
-    for rota, (_, num_voos_diarios) in voos_diarios.items():
-        horarios = random.sample(range(6, 22), num_voos_diarios)
-        individuo[rota] = sorted(horarios)
+    for rota, (duracao, num_voos_diarios) in voos_diarios.items():
+        horarios = sorted(random.sample(range(6, 22), num_voos_diarios))
+        individuo[rota] = horarios
     return individuo
 
 def calcular_fitness(individuo):
@@ -44,31 +44,36 @@ def selecao_torneio(populacao, tamanho_torneio=5):
     melhor = min(torneio, key=calcular_fitness)
     return melhor
 
-def crossover(pai1, pai2):
+def crossover_sem_sobreposicao(pai1, pai2):
     filho = {}
     for rota in voos_diarios.keys():
-        filho[rota] = pai1[rota] if random.random() < 0.5 else pai2[rota]
+        if random.random() < 0.5:
+            filho[rota] = pai1[rota][:]
+        else:
+            filho[rota] = pai2[rota][:]
     return filho
 
-def mutacao(individuo):
+def mutacao_sem_sobreposicao(individuo):
     rota = random.choice(list(voos_diarios.keys()))
     num_voos_diarios = voos_diarios[rota][1]
     if rota in individuo and individuo[rota]:
         index = random.randrange(len(individuo[rota]))
-        individuo[rota][index] = random.randint(6, 21)
-        individuo[rota] = sorted(individuo[rota])
+        novos_horarios = list(set(range(6, 22)) - set(individuo[rota]))
+        if novos_horarios:
+            individuo[rota][index] = random.choice(novos_horarios)
+            individuo[rota] = sorted(individuo[rota])
     return individuo
 
 def algoritmo_genetico(tamanho_populacao=50, geracoes=100, taxa_mutacao=0.1):
-    populacao = [gerar_individuo() for _ in range(tamanho_populacao)]
+    populacao = [gerar_individuo_sem_sobreposicao() for _ in range(tamanho_populacao)]
     for _ in range(geracoes):
         nova_populacao = []
         while len(nova_populacao) < tamanho_populacao:
             pai1 = selecao_torneio(populacao)
             pai2 = selecao_torneio(populacao)
-            filho = crossover(pai1, pai2)
+            filho = crossover_sem_sobreposicao(pai1, pai2)
             if random.random() < taxa_mutacao:
-                filho = mutacao(filho)
+                filho = mutacao_sem_sobreposicao(filho)
             nova_populacao.append(filho)
         populacao = sorted(nova_populacao, key=calcular_fitness)[:tamanho_populacao]
     return min(populacao, key=calcular_fitness)
