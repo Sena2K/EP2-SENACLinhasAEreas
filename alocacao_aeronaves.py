@@ -15,7 +15,7 @@ voos_diarios = {
     ("Belo Horizonte (CNF)", "Brasilia (BSB)"): (1.5, 7)
 }
 
-def gerar_individuo_sem_sobreposicao():
+def gerar_individuo():
     individuo = {}
     for rota, (duracao, num_voos_diarios) in voos_diarios.items():
         horarios = sorted(random.sample(range(6, 22), num_voos_diarios))
@@ -44,7 +44,7 @@ def selecao_torneio(populacao, tamanho_torneio=5):
     melhor = min(torneio, key=calcular_fitness)
     return melhor
 
-def crossover_sem_sobreposicao(pai1, pai2):
+def crossover(pai1, pai2):
     filho = {}
     for rota in voos_diarios.keys():
         if random.random() < 0.5:
@@ -53,7 +53,7 @@ def crossover_sem_sobreposicao(pai1, pai2):
             filho[rota] = pai2[rota][:]
     return filho
 
-def mutacao_sem_sobreposicao(individuo):
+def mutacao(individuo):
     rota = random.choice(list(voos_diarios.keys()))
     num_voos_diarios = voos_diarios[rota][1]
     if rota in individuo and individuo[rota]:
@@ -65,15 +65,15 @@ def mutacao_sem_sobreposicao(individuo):
     return individuo
 
 def algoritmo_genetico(tamanho_populacao=50, geracoes=100, taxa_mutacao=0.1):
-    populacao = [gerar_individuo_sem_sobreposicao() for _ in range(tamanho_populacao)]
+    populacao = [gerar_individuo() for _ in range(tamanho_populacao)]
     for _ in range(geracoes):
         nova_populacao = []
         while len(nova_populacao) < tamanho_populacao:
             pai1 = selecao_torneio(populacao)
             pai2 = selecao_torneio(populacao)
-            filho = crossover_sem_sobreposicao(pai1, pai2)
+            filho = crossover(pai1, pai2)
             if random.random() < taxa_mutacao:
-                filho = mutacao_sem_sobreposicao(filho)
+                filho = mutacao(filho)
             nova_populacao.append(filho)
         populacao = sorted(nova_populacao, key=calcular_fitness)[:tamanho_populacao]
     return min(populacao, key=calcular_fitness)
