@@ -1,10 +1,10 @@
 from typing import Dict, List, Tuple
 import random
-Route = Tuple[str, str]
-Schedule = Dict[Route, List[int]]
-FitnessDetails = Tuple[float, int, Dict[int, List[Tuple[Route, int]]]]
+Rota = Tuple[str, str]
+Schedule = Dict[Rota, List[int]]
+Fitness = Tuple[float, int, Dict[int, List[Tuple[Rota, int]]]]
 
-voos_diarios: Dict[Route, Tuple[float, int]] = {
+voos_diarios: Dict[Rota, Tuple[float, int]] = {
     ("Sao Paulo (GRU)", "Rio de Janeiro (GIG)"): (1.0, 10),
     ("Sao Paulo (GRU)", "Brasilia (BSB)"): (2.0, 6),
     ("Sao Paulo (GRU)", "Belo Horizonte (CNF)"): (1.5, 8),
@@ -86,6 +86,7 @@ def algoritmo_genetico(geracoes: int = 100, tamanho_populacao: int = 50) -> Tupl
         melhor_fitness = max(fitnesses)
         historico_fitness.append(melhor_fitness)
         
+        # Imprime o melhor fitness desta geração
         print(f"Geração {g + 1}: Melhor Fitness = {melhor_fitness}")
         
         nova_populacao = selecao(populacao, fitnesses)
