@@ -1,6 +1,5 @@
 from typing import Dict, List, Tuple
 import random
-
 Route = Tuple[str, str]
 Schedule = Dict[Route, List[int]]
 FitnessDetails = Tuple[float, int, Dict[int, List[Tuple[Route, int]]]]
@@ -21,156 +20,132 @@ voos_diarios: Dict[Route, Tuple[float, int]] = {
 }
 
 def gerar_individuo() -> Schedule:
-    individuo: Schedule = {}
-    for rota, (_, num_voos_diarios) in voos_diarios.items():
-        horarios = sorted(random.sample(range(6, 22), num_voos_diarios))
-        individuo[rota] = horarios
+    return {rota: sorted(random.sample(range(6, 22), num_voos)) for rota, (_, num_voos) in voos_diarios.items()}
+
+def calcular_tempo_ocioso_e_uso_de_avioes(individuo: Schedule) -> Tuple[int, int, float]:
+    """Calcula o número total de aviões usados, o total de tempo ocioso e penalidades por uso ineficiente."""
+    voos_organizados = [(rota, horario) for rota, horarios in individuo.items() for horario in horarios]
+    voos_organizados.sort(key=lambda x: x[1]) 
+    
+    avioes_em_uso = {}
+    tempo_ocioso_total = 0
+    ultimo_horario_por_aviao = {}
+    
+    for rota, horario_partida in voos_organizados:
+        duracao_voo = voos_diarios[rota][0]
+        horario_chegada = horario_partida + duracao_voo
+        aviao_alocado = None
+        
+        for aviao, (ultima_chegada, ultima_destino) in ultimo_horario_por_aviao.items():
+            if ultima_destino == rota[0] and horario_partida >= ultima_chegada + 1.5: 
+                aviao_alocado = aviao
+                tempo_ocioso_total += horario_partida - ultima_chegada - 1.5
+                break
+                
+        if not aviao_alocado:
+            aviao_alocado = len(avioes_em_uso) + 1
+            avioes_em_uso[aviao_alocado] = []
+            
+        avioes_em_uso[aviao_alocado].append((rota, horario_partida, horario_chegada))
+        ultimo_horario_por_aviao[aviao_alocado] = (horario_chegada, rota[1])
+    
+    penalidade = len(avioes_em_uso) * 10 + tempo_ocioso_total
+    
+    return len(avioes_em_uso), tempo_ocioso_total, 1 / (1 + penalidade)  
+
+def fitness(individuo: Schedule) -> float:
+    _, _, fitness_value = calcular_tempo_ocioso_e_uso_de_avioes(individuo)
+    return fitness_value
+
+def selecao(populacao: List[Schedule], fitnesses: List[float]) -> List[Schedule]:
+    selecionados = []
+    for _ in range(len(populacao) // 2):
+        i, j = random.sample(range(len(populacao)), 2)
+        selecionados.append(populacao[i] if fitnesses[i] > fitnesses[j] else populacao[j])
+    return selecionados
+
+def mutacao(individuo: Schedule, taxa_mutacao: float = 0.1) -> Schedule:
+    if random.random() < taxa_mutacao:
+        rota = random.choice(list(individuo.keys()))
+        individuo[rota] = sorted(random.sample(range(6, 22), len(individuo[rota])))
     return individuo
 
-def otimizar_alocacao_e_horarios(individuo: Schedule, limite_tempo_ocioso: int = 4) -> FitnessDetails:
-    avioes_detalhes = {}
-    avioes_horarios = {}
-    aviao_id = 0
-    penalidade_tempo_ocioso = 0
-
-    todos_voos = [(rota, horario) for rota, horarios in individuo.items() for horario in horarios]
-    todos_voos.sort(key=lambda x: x[1])
-
-    for rota, horario_partida in todos_voos:
-        origem, destino = rota
-        duracao_voo, _ = voos_diarios[rota]
-        horario_partida_real = horario_partida - 1
-        horario_chegada = horario_partida + duracao_voo + 0.5
-
-        aviao_alocado = None
-        for aviao_id, (ult_destino, ult_horario_chegada) in avioes_horarios.items():
-            if origem == ult_destino and ult_horario_chegada <= horario_partida_real:
-                aviao_alocado = aviao_id
-                break
-
-        if aviao_alocado is not None:
-            tempo_ocioso = horario_partida_real - ult_horario_chegada
-            if tempo_ocioso > limite_tempo_ocioso:
-                penalidade_tempo_ocioso += tempo_ocioso - limite_tempo_ocioso
-
-            avioes_detalhes[aviao_alocado].append((rota, horario_partida))
-            avioes_horarios[aviao_alocado] = (destino, horario_chegada)
-        else:
-            aviao_id += 1
-            avioes_detalhes[aviao_id] = [(rota, horario_partida)]
-            avioes_horarios[aviao_id] = (destino, horario_chegada)
-
-    num_avioes = len(avioes_detalhes)
-
-    num_voos_total = sum(len(voos) for voos in avioes_detalhes.values())
-    penalidade_ocioso = num_voos_total / (num_avioes + 1)
-
-    
-    penalidade_um_voo = sum(1 for voos in avioes_detalhes.values() if len(voos) == 1)
-
-    fitness = 1 / (1 + num_avioes * 0.05) - penalidade_ocioso - penalidade_um_voo * 0.1 - penalidade_tempo_ocioso * 0.05
-
-    return fitness, num_avioes, avioes_detalhes
-
-
-def selecao_por_torneio(populacao, fitness_populacao, tamanho_torneio, num_pais):
-    pais_selecionados = []
-
-    for _ in range(num_pais):
-        indices_torneio = random.sample(range(len(populacao)), tamanho_torneio)
-        
-        melhor_fitness = float('-inf')
-        melhor_individuo = None
-        for indice in indices_torneio:
-            if fitness_populacao[indice] > melhor_fitness:
-                melhor_fitness = fitness_populacao[indice]
-                melhor_individuo = populacao[indice]
-        
-        pais_selecionados.append(melhor_individuo)
-
-    return pais_selecionados
-
-def mutacao(individuo: Schedule, taxa_mutacao: float) -> Schedule:
-    novo_individuo = individuo.copy()
-    num_avioes = len(novo_individuo)
-    num_voos_total = sum(len(horarios) for horarios in novo_individuo.values())
-    media_voos_por_aviao = num_voos_total / num_avioes
-
-    for aviao, horarios in novo_individuo.items():
-        # Se o avião tem menos voos que a média, redistribuir voos dos aviões mais ociosos
-        if len(horarios) < media_voos_por_aviao and random.random() < taxa_mutacao:
-            for rota, _ in random.sample(list(voos_diarios.keys()), len(horarios)):
-                if rota in novo_individuo and len(novo_individuo[rota]) > media_voos_por_aviao:
-                    # Remover um voo de um avião mais ocupado e atribuí-lo ao avião atual
-                    idx_remover = random.randint(0, len(novo_individuo[rota]) - 1)
-                    novo_horario = novo_individuo[rota].pop(idx_remover)
-                    novo_individuo[rota].sort()
-                    novo_individuo[aviao].append(novo_horario)
-                    novo_individuo[aviao].sort()
-                    break
-
-    return novo_individuo
-
-def crossover(pai1: Schedule, pai2: Schedule, taxa_crossover: float) -> Tuple[Schedule, Schedule]:
-    if random.random() > taxa_crossover:
-        return pai1, pai2
-    
+def crossover(pai1: Schedule, pai2: Schedule) -> Tuple[Schedule, Schedule]:
     filho1, filho2 = pai1.copy(), pai2.copy()
-    ponto_corte = random.randint(1, len(pai1) - 2)
-    for i, rota in enumerate(pai1):
-        if i >= ponto_corte:
+    for rota in filho1.keys():
+        if random.random() > 0.5:
             filho1[rota], filho2[rota] = filho2[rota], filho1[rota]
     return filho1, filho2
 
-def algoritmo_genetico(populacao_inicial, geracoes, taxa_mutacao, taxa_crossover, tamanho_torneio, num_pais):
-    populacao = populacao_inicial
+def algoritmo_genetico(geracoes: int = 100, tamanho_populacao: int = 50) -> Tuple[Schedule, List[float]]:
+    populacao = [gerar_individuo() for _ in range(tamanho_populacao)]
     historico_fitness = []
 
-    for geracao in range(geracoes):
-        fitness_populacao = [otimizar_alocacao_e_horarios(individuo)[0] for individuo in populacao]
-        
-        pais = selecao_por_torneio(populacao, fitness_populacao, tamanho_torneio, num_pais)
-        
-        nova_populacao = []
-        while len(nova_populacao) < len(populacao):
-            pai1, pai2 = random.sample(pais, 2)
-            filho1, filho2 = crossover(pai1, pai2, taxa_crossover)
-            filho1 = mutacao(filho1, taxa_mutacao)
-            filho2 = mutacao(filho2, taxa_mutacao)
-            nova_populacao.extend([filho1, filho2])
-        
-        populacao = nova_populacao[:len(populacao)]
-        melhor_fitness = max(fitness_populacao)
+    for g in range(geracoes):
+        fitnesses = [fitness(individuo) for individuo in populacao]
+        melhor_fitness = max(fitnesses)
         historico_fitness.append(melhor_fitness)
-        print(f"Geração {geracao + 1}: Melhor Fitness = {melhor_fitness}")
+        
+        print(f"Geração {g + 1}: Melhor Fitness = {melhor_fitness}")
+        
+        nova_populacao = selecao(populacao, fitnesses)
+        descendentes = []
+        while len(descendentes) < tamanho_populacao:
+            pai1, pai2 = random.sample(nova_populacao, 2)
+            filho1, filho2 = crossover(pai1, pai2)
+            descendentes.append(mutacao(filho1))
+            descendentes.append(mutacao(filho2))
+        populacao = descendentes[:tamanho_populacao]
+    
+    melhor_individuo = max(populacao, key=fitness)
+    return melhor_individuo, historico_fitness
 
-    return populacao, historico_fitness
+melhor_individuo, historico_fitness = algoritmo_genetico(geracoes=50, tamanho_populacao=100)
 
-NUM_INDIVIDUOS = 50
-GERACOES = 50
-TAXA_MUTACAO = 0.1
-TAXA_CROSSOVER = 0.7
-TAMANHO_TORNEIO = 5
-NUM_PAIS = 25
+def formatar_e_imprimir_resultado(melhor_individuo: Schedule):
+    voos_organizados = []
+    for rota, horarios in melhor_individuo.items():
+        for horario in horarios:
+            voos_organizados.append((rota, horario))
+    voos_organizados.sort(key=lambda x: x[1])
 
-populacao_inicial = [gerar_individuo() for _ in range(NUM_INDIVIDUOS)]
+    alocacao_avioes = {}
+    ultimo_destino = {}
+    ultimo_horario_chegada = {}
+    aviao_id = 1
 
-populacao_final, historico_fitness = algoritmo_genetico(populacao_inicial, GERACOES, TAXA_MUTACAO, TAXA_CROSSOVER, TAMANHO_TORNEIO, NUM_PAIS)
+    for rota, partida in voos_organizados:
+        origem, destino = rota
+        duracao_voo = voos_diarios[rota][0]
+        horario_chegada = partida + duracao_voo
+
+        aviao_alocado = None
+        for aviao, dest in ultimo_destino.items():
+            if dest == origem and ultimo_horario_chegada[aviao] <= partida:
+                aviao_alocado = aviao
+                break
+
+        if aviao_alocado is None:
+            aviao_alocado = aviao_id
+            aviao_id += 1
+
+        alocacao_avioes.setdefault(aviao_alocado, []).append((rota, partida))
+        ultimo_destino[aviao_alocado] = destino
+        ultimo_horario_chegada[aviao_alocado] = horario_chegada
+
+    for aviao, voos in alocacao_avioes.items():
+        print(f"Avião {aviao}:")
+        for rota, horario in voos:
+            print(f"  {rota[0]} -> {rota[1]} às {horario}h")
+        print()
+
+melhor_individuo, historico_fitness = algoritmo_genetico(geracoes=50, tamanho_populacao=50)
 
 print("\nHistórico de Fitness por Geração:")
 for i, fitness in enumerate(historico_fitness, 1):
     print(f"Geração {i}: {fitness}")
 
-melhor_individuo = max(populacao_final, key=lambda individuo: otimizar_alocacao_e_horarios(individuo)[0])
-fitness, num_avioes, avioes_detalhes = otimizar_alocacao_e_horarios(melhor_individuo)
+formatar_e_imprimir_resultado(melhor_individuo)
 
-saida = f"Fitness: {fitness}, Número de aviões: {num_avioes}\n\n"
-for aviao, voos in avioes_detalhes.items():
-    saida += f"Avião {aviao}:\n"
-    for rota, partida in voos:
-        saida += f"  {rota[0]} -> {rota[1]} às {partida}h\n"
-    saida += "\n"
 
-saida.strip()
 
-print(saida)
