@@ -49,7 +49,6 @@ def otimizar_alocacao_e_horarios(individuo: Schedule, limite_tempo_ocioso: int =
                 break
 
         if aviao_alocado is not None:
-            # Calcula a diferença de tempo ocioso
             tempo_ocioso = horario_partida_real - ult_horario_chegada
             if tempo_ocioso > limite_tempo_ocioso:
                 penalidade_tempo_ocioso += tempo_ocioso - limite_tempo_ocioso
