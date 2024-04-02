@@ -41,18 +41,18 @@ def otimizar_alocacao_e_horarios(individuo: Schedule, limite_tempo_ocioso: int =
         duracao_voo, _ = voos_diarios[rota]
         horario_partida_real = horario_partida - 1
         horario_chegada = horario_partida + duracao_voo + 0.5
+        intervalo_requerido_apos_chegada = 1.5
 
         aviao_alocado = None
-        for aviao_id, (ult_destino, ult_horario_chegada) in avioes_horarios.items():
-            if origem == ult_destino and ult_horario_chegada <= horario_partida_real:
-                aviao_alocado = aviao_id
+        for aviao, (ult_destino, ult_horario_chegada) in avioes_horarios.items():
+            if origem == ult_destino and (ult_horario_chegada + intervalo_requerido_apos_chegada) <= horario_partida_real:
+                aviao_alocado = aviao
                 break
 
         if aviao_alocado is not None:
             tempo_ocioso = horario_partida_real - ult_horario_chegada
             if tempo_ocioso > limite_tempo_ocioso:
                 penalidade_tempo_ocioso += tempo_ocioso - limite_tempo_ocioso
-
             avioes_detalhes[aviao_alocado].append((rota, horario_partida))
             avioes_horarios[aviao_alocado] = (destino, horario_chegada)
         else:
@@ -62,13 +62,8 @@ def otimizar_alocacao_e_horarios(individuo: Schedule, limite_tempo_ocioso: int =
 
     num_avioes = len(avioes_detalhes)
 
-    num_voos_total = sum(len(voos) for voos in avioes_detalhes.values())
-    penalidade_ocioso = num_voos_total / (num_avioes + 1)
-
-    
-    penalidade_um_voo = sum(1 for voos in avioes_detalhes.values() if len(voos) == 1)
-
-    fitness = 1 / (1 + num_avioes * 0.05) - penalidade_ocioso - penalidade_um_voo * 0.1 - penalidade_tempo_ocioso * 0.05
+    penalidade_numero_avioes = num_avioes * 0.05
+    fitness = 1 / (1 + penalidade_numero_avioes + penalidade_tempo_ocioso * 0.05)
 
     return fitness, num_avioes, avioes_detalhes
 
@@ -78,14 +73,14 @@ def selecao_por_torneio(populacao, fitness_populacao, tamanho_torneio, num_pais)
 
     for _ in range(num_pais):
         indices_torneio = random.sample(range(len(populacao)), tamanho_torneio)
-        
+
         melhor_fitness = float('-inf')
         melhor_individuo = None
         for indice in indices_torneio:
             if fitness_populacao[indice] > melhor_fitness:
                 melhor_fitness = fitness_populacao[indice]
                 melhor_individuo = populacao[indice]
-        
+
         pais_selecionados.append(melhor_individuo)
 
     return pais_selecionados
@@ -114,13 +109,16 @@ def mutacao(individuo: Schedule, taxa_mutacao: float) -> Schedule:
 def crossover(pai1: Schedule, pai2: Schedule, taxa_crossover: float) -> Tuple[Schedule, Schedule]:
     if random.random() > taxa_crossover:
         return pai1, pai2
-    
+
     filho1, filho2 = pai1.copy(), pai2.copy()
     ponto_corte = random.randint(1, len(pai1) - 2)
     for i, rota in enumerate(pai1):
         if i >= ponto_corte:
-            filho1[rota], filho2[rota] = filho2[rota], filho1[rota]
+            if rota in pai2:
+                filho1[rota], filho2[rota] = filho2[rota], filho1[rota]
+
     return filho1, filho2
+
 
 def algoritmo_genetico(populacao_inicial, geracoes, taxa_mutacao, taxa_crossover, tamanho_torneio, num_pais):
     populacao = populacao_inicial
@@ -128,9 +126,9 @@ def algoritmo_genetico(populacao_inicial, geracoes, taxa_mutacao, taxa_crossover
 
     for geracao in range(geracoes):
         fitness_populacao = [otimizar_alocacao_e_horarios(individuo)[0] for individuo in populacao]
-        
+
         pais = selecao_por_torneio(populacao, fitness_populacao, tamanho_torneio, num_pais)
-        
+
         nova_populacao = []
         while len(nova_populacao) < len(populacao):
             pai1, pai2 = random.sample(pais, 2)
@@ -138,7 +136,7 @@ def algoritmo_genetico(populacao_inicial, geracoes, taxa_mutacao, taxa_crossover
             filho1 = mutacao(filho1, taxa_mutacao)
             filho2 = mutacao(filho2, taxa_mutacao)
             nova_populacao.extend([filho1, filho2])
-        
+
         populacao = nova_populacao[:len(populacao)]
         melhor_fitness = max(fitness_populacao)
         historico_fitness.append(melhor_fitness)
@@ -171,6 +169,4 @@ for aviao, voos in avioes_detalhes.items():
         saida += f"  {rota[0]} -> {rota[1]} às {partida}h\n"
     saida += "\n"
 
-saida.strip()
-
-print(saida)
+print(saida.strip())
